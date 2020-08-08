@@ -1,13 +1,13 @@
 from pwn import *
+from time import sleep
 import sys
 
 process_name = ""
 host = ""
 port = 0
-arch_bit = 64
 
-if len(sys.argv) < 1:
-	raise Exception("solve.py (local|remote|ssh)")
+# libc = ELF("./libc.so.6")
+
 
 def get_stream(process_type):
 	if process_type == "local":
@@ -15,29 +15,50 @@ def get_stream(process_type):
 	elif process_type == "remote":
 		return remote(host=host, port=port)
 	elif process_type == "ssh":
-		name = ""
-		password = ""
-		host = ""
-		remote_process_name = ""
-		server = ssh(host=host, user=name, password=password)
+		remote_user = ""
+		remote_password = ""
+		server = ssh(host=host, user=remote_user, password=remote_password)
 		return server.process(remote_process_name)
 	raise Exception("Invalid process type.")
 
-def pack(content):
-	if arch_bit == 32:
-		return p32(content)
-	elif arch_bit == 64:
-		return p64(content)
-	else:
-		raise Exception("No support this architecture.")
+
+def init():
+	if "libc" in globals():
+		libc.address = 0
+	context.os = 'linux'
+	context.arch = 'amd64'
+	context.terminal = ["~/bin/wterminal"]
+
 
 def solve(io):
 	io.readline()
 
 
 def main():
+	init()
+	if len(sys.argv) <= 1:
+		raise Exception("solve.py (local|remote|ssh)")
+
 	io = get_stream(sys.argv[1])
+
+	if len(sys.argv) > 2 and sys.argv[2] == "debug":
+		gdb_command = [
+			"b *main",
+			"c"
+		]
+		gdb.attach(io, "\n".join(gdb_command))
+
 	solve(io)
 	io.interactive()
+
+def force(io):
+	while 1:
+		try:
+			main()
+		except Exception as e:
+			if sys.argv[1] != "local":
+				sleep(1)
+			print(e)
+			continue
 
 main()
